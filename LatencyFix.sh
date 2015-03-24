@@ -20,10 +20,10 @@ tcp_sack=$(sysctl -ne net.ipv4.tcp_sack )
 tcp_window_scaling=$(sysctl -ne net.ipv4.tcp_window_scaling )
 tcp_timestamps=$(sysctl -ne net.ipv4.tcp_timestamps)
 
-[[ $def_sys_rmem != $def_proc_rmem ]] && echo "rmem_default:  sys($def_sys_rmem) vs proc($def_proc_rmem)"
-[[ $def_sys_wmem != $def_proc_wmem ]] && echo "wmem_default:  sys($def_sys_wmem) vs proc($def_proc_wmem)"
-[[ $max_sys_rmem != $max_proc_rmem ]] && echo "    rmem_max:  sys($max_sys_rmem) vs proc($max_proc_rmem)"
-[[ $max_sys_wmem != $max_proc_wmem ]] && echo "    wmem_max:  sys($max_sys_wmem) vs proc($max_proc_wmem)"
+if [ $def_sys_rmem != $def_proc_rmem ]; then echo "rmem_default:  sys($def_sys_rmem) vs proc($def_proc_rmem)"; fi
+if [ $def_sys_wmem != $def_proc_wmem ]; then echo "wmem_default:  sys($def_sys_wmem) vs proc($def_proc_wmem)"; fi
+if [ $max_sys_rmem != $max_proc_rmem ]; then echo "    rmem_max:  sys($max_sys_rmem) vs proc($max_proc_rmem)"; fi
+if [ $max_sys_wmem != $max_proc_wmem ]; then echo "    wmem_max:  sys($max_sys_wmem) vs proc($max_proc_wmem)"; fi
 
 # TCP Window Size to test (MSS) -  IPv6 tunnels are 1266?
 WINDOW=1200
@@ -44,24 +44,26 @@ MILLISECONDS=1000
 
 WINDOW_BYTES=$(( 2* $BW * $DELAY / $MILLISECONDS / 8 ))  # 2x because end-to-end
 
-[[ $max_sys_rmem -ge ${WINDOW_BYTES} ]] && echo "TCP Window max_rmrm should be ${WINDOW_BYTES}, minimum"
-[[ $max_sys_wmem -ge ${WINDOW_BYTES} ]] && echo "TCP Window max_wmrm should be ${WINDOW_BYTES}, minimum"
+if [ $max_sys_rmem -ge ${WINDOW_BYTES} ]; then echo "TCP Window max_rmrm should be ${WINDOW_BYTES}, minimum"; fi
+if [ $max_sys_wmem -ge ${WINDOW_BYTES} ]; then echo "TCP Window max_wmrm should be ${WINDOW_BYTES}, minimum"; fi
 
-[[ $pmtu_disc -ne 0 ]] && echo "sysctl -w net.ipv4.ip_no_pmtu_disc=0"
-[[ $tcp_ecn  -ne 0 ]] && echo "sysctl -w net.ipv4.tcp_ecn=0"
-[[ $tcp_fack  -ne 1 ]] && echo "sysctl -w net.ipv4.tcp_fack=1"
-[[ $tcp_rfc1337  -ne 1 ]] && echo "sysctl -w net.ipv4.tcp_rfc1337=1"
-[[ $tcp_sack  -ne 1 ]] && echo "sysctl -w net.ipv4.tcp_sack=1"
-[[ $tcp_window_scaling  -ne 1 ]] && echo "sysctl -w net.ipv4.tcp_window_scaling=1"
+if [ $pmtu_disc -ne 0 ]; then echo "sysctl -w net.ipv4.ip_no_pmtu_disc=0"; fi
+if [ $tcp_ecn  -ne 0 ]; then echo "sysctl -w net.ipv4.tcp_ecn=0"; fi
+if [ $tcp_fack  -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_fack=1"; fi
+if [ $tcp_rfc1337  -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_rfc1337=1"; fi
+if [ $tcp_sack  -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_sack=1"; fi
+if [ $tcp_window_scaling  -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_window_scaling=1"; fi
 
 
-[[ $DELAY -lt 150 ]] && \
-	[[ $tcp_timestamps -ne 1 ]] && \
-		echo "sysctl -w net.ipv4.tcp_timestamps=1"
-
-[[ $DELAY -gt 300 ]] && \
-	[[ -z "${congestctls##*hybla*}" ]] && \
-		echo "sysctl -w net.ipv4.tcp_congestion_control=hybla"
+if [ $DELAY -le 150 ]
+then
+	if [ $tcp_timestamps -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_timestamps=1"; fi
+elif [ $DELAY -ge 300 ]
+then
+	if [ -z "${congestctls##*hybla*}" ]; then echo "sysctl -w net.ipv4.tcp_congestion_control=hybla"; fi
+# else
+#       Delay is between 150 and 300... nothing to do for mid-range congestion changes
+fi
 
 
 
@@ -127,3 +129,4 @@ EOF
 fi
 
 fi
+
