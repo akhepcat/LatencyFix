@@ -4,6 +4,7 @@ DEFIF=$(awk 'BEGIN { IGNORECASE=1 } /^[a-z0-9]+[ \t]+00000000/ { print $1 }' /pr
 
 # Grab the current information
 congestctls=$(sysctl -n -e net.ipv4.tcp_available_congestion_control)
+congestctl=$(sysctl -n -e net.ipv4.tcp_congestion_control)
 def_sys_rmem=$(sysctl -n -e net.core.rmem_default)
 def_proc_rmem=$(cat /proc/sys/net/core/rmem_default)
 def_sys_wmem=$(sysctl -n -e net.core.wmem_default)
@@ -44,8 +45,8 @@ MILLISECONDS=1000
 
 WINDOW_BYTES=$(( 2* $BW * $DELAY / $MILLISECONDS / 8 ))  # 2x because end-to-end
 
-if [ $max_sys_rmem -ge ${WINDOW_BYTES} ]; then echo "TCP Window max_rmrm should be ${WINDOW_BYTES}, minimum"; fi
-if [ $max_sys_wmem -ge ${WINDOW_BYTES} ]; then echo "TCP Window max_wmrm should be ${WINDOW_BYTES}, minimum"; fi
+if [ $max_sys_rmem -lt ${WINDOW_BYTES} ]; then echo "sysctl -w net.core.rmem_max=${WINDOW_BYTES}"; fi
+if [ $max_sys_wmem -lt ${WINDOW_BYTES} ]; then echo "sysctl -w net.core.wmem_max=${WINDOW_BYTES}"; fi
 
 if [ $pmtu_disc -ne 0 ]; then echo "sysctl -w net.ipv4.ip_no_pmtu_disc=0"; fi
 if [ $tcp_ecn  -ne 0 ]; then echo "sysctl -w net.ipv4.tcp_ecn=0"; fi
@@ -60,7 +61,10 @@ then
 	if [ $tcp_timestamps -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_timestamps=1"; fi
 elif [ $DELAY -ge 300 ]
 then
-	if [ -z "${congestctls##*hybla*}" ]; then echo "sysctl -w net.ipv4.tcp_congestion_control=hybla"; fi
+	if [ -z "${congestctls##*hybla*}" -a -n "${congestctl##*hybla*}" ]
+	then
+		echo "sysctl -w net.ipv4.tcp_congestion_control=hybla"
+	fi
 # else
 #       Delay is between 150 and 300... nothing to do for mid-range congestion changes
 fi
