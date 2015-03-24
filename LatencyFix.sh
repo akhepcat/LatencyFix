@@ -1,5 +1,42 @@
 #!/bin/bash
 
+RATE=${1,,}
+if [ -z "${RATE}" ]
+then
+	RATE=100000000
+	MULTI=1
+elif [ -z "${RATE%%[0-9]*kb}" ]
+then
+	echo "bandwidth in KiB"
+	MULTI=1024
+elif [ -z "${RATE%%[0-9]*k}" ]
+then
+	echo "bandwidth in K"
+	MULTI=1000
+elif [ -z "${RATE%%[0-9]*mb}" ]
+then
+	echo "bandwidth in MiB"
+	MULTI=$((1024 * 1024))
+elif [ -z "${RATE%%[0-9]*m}" ]
+then
+	echo "bandwidth in M"
+	MULTI=$((1000 * 1000))
+elif [ -z "${RATE%%[0-9]*gb}" ]
+then
+	echo "bandwidth in GiB"
+	MULTI=$((1024 * 1024 * 1024))
+elif [ -z "${RATE%%[0-9]*g}" ]
+then
+	echo "bandwidth in G"
+	MULTI=$((1000 * 1000 * 1000))
+elif [ -n "${RATE//[^0-9]/}" ]
+then
+	MULTI=1
+fi
+BANDWIDTH=${RATE//[^0-9]/}
+BANDWIDTH=$((BANDWIDTH * $MULTI))
+echo "bandwidth set to ${BANDWIDTH} bits per second" 1>&2
+
 DEFIF=$(awk 'BEGIN { IGNORECASE=1 } /^[a-z0-9]+[ \t]+00000000/ { print $1 }' /proc/net/route)
 
 # Grab the current information
@@ -40,10 +77,9 @@ DELAY=${RTT%%.*}
 
 ## bad assumption of 100mb/s of maximum throughput
 
-BW=100000000
 MILLISECONDS=1000
 
-WINDOW_BYTES=$(( 2* $BW * $DELAY / $MILLISECONDS / 8 ))  # 2x because end-to-end
+WINDOW_BYTES=$(( 2* $BANDWIDTH * $DELAY / $MILLISECONDS / 8 ))  # 2x because end-to-end
 
 if [ $max_sys_rmem -lt ${WINDOW_BYTES} ]; then echo "sysctl -w net.core.rmem_max=${WINDOW_BYTES}"; fi
 if [ $max_sys_wmem -lt ${WINDOW_BYTES} ]; then echo "sysctl -w net.core.wmem_max=${WINDOW_BYTES}"; fi
