@@ -1,33 +1,81 @@
 #!/bin/bash
+PROG="${0##*/}"
+DEBUG=0
+SYSCTL=""
+
+usage() {
+	printf "${PROG} [--help|-h|--debug|-d|-s|--sysctl] {bandwidth}\n"
+	printf "\n"
+	printf " * bandwidth can be specified as bare bits, KiB, KB, MiB, MB, GiB, and GB\n"
+	printf " * commas are optional and will be stripped out\n"
+	printf " * -s|--sysctl  output sysctl statements (defaults to bare values for adding to /etc/sysctl.d)\n"
+	printf "\n"
+	printf "examples:\n"
+	printf "     # ${PROG}  10GB\n"
+	printf "     # ${PROG}  100MB\n"
+	printf "     # ${PROG}  100,000,000\n"
+	printf "     # ${PROG}  1000000\n"
+	printf "\n"
+	printf "No changes will be made to the system, but suggested commands/values will be printed\n\n"
+	printf "*** not seeing any suggestions?  You may be all tuned, or over-tuned.  Try disabling your existing tuning first!\n"
+	printf "\n"
+	exit 1
+}
+
+debug() {
+	if [ ${DEBUG} -gt 0 ]
+	then
+		printf "${*}\n" 1>&2;
+	fi
+}
+
+inform() {
+	printf "${*}\n" 1>&2;
+}
+
+if [ -z "${1}" -o -z "${1%%*h*}" ]
+then
+	usage
+fi
+
+if [ -z "${1%%*d*}" ]
+then
+	DEBUG=1
+	shift
+fi
+
+if [ -z "${1%%*s*}" ]
+then
+	SYSCTL="sysctl -w "
+	shift
+fi
 
 RATE=${1,,}
-if [ -z "${RATE}" ]
+RATE=${RATE//,/}
+
+if [ -z "${RATE%%[0-9]*ki*}" ]
 then
-	RATE=100000000
-	MULTI=1
-elif [ -z "${RATE%%[0-9]*kb}" ]
-then
-	echo "bandwidth in KiB"
+	debug "bandwidth in KiB/s"
 	MULTI=1024
-elif [ -z "${RATE%%[0-9]*k}" ]
+elif [ -z "${RATE%%[0-9]*k*}" ]
 then
-	echo "bandwidth in K"
+	debug "bandwidth in KB/s"
 	MULTI=1000
-elif [ -z "${RATE%%[0-9]*mb}" ]
+elif [ -z "${RATE%%[0-9]*mi*}" ]
 then
-	echo "bandwidth in MiB"
+	debug "bandwidth in MiB/s"
 	MULTI=$((1024 * 1024))
-elif [ -z "${RATE%%[0-9]*m}" ]
+elif [ -z "${RATE%%[0-9]*m*}" ]
 then
-	echo "bandwidth in M"
+	debug "bandwidth in MB/s"
 	MULTI=$((1000 * 1000))
-elif [ -z "${RATE%%[0-9]*gb}" ]
+elif [ -z "${RATE%%[0-9]*gi*}" ]
 then
-	echo "bandwidth in GiB"
+	debug "bandwidth in GiB/s"
 	MULTI=$((1024 * 1024 * 1024))
-elif [ -z "${RATE%%[0-9]*g}" ]
+elif [ -z "${RATE%%[0-9]*g*}" ]
 then
-	echo "bandwidth in G"
+	debug "bandwidth in GB/s"
 	MULTI=$((1000 * 1000 * 1000))
 elif [ -n "${RATE//[^0-9]/}" ]
 then
@@ -35,7 +83,7 @@ then
 fi
 BANDWIDTH=${RATE//[^0-9]/}
 BANDWIDTH=$((BANDWIDTH * $MULTI))
-echo "bandwidth set to ${BANDWIDTH} bits per second" 1>&2
+inform "# bandwidth set to ${BANDWIDTH} bits per second"
 
 DEFIF=$(awk 'BEGIN { IGNORECASE=1 } /^[a-z0-9]+[ \t]+00000000/ { print $1 }' /proc/net/route)
 
@@ -58,51 +106,86 @@ tcp_sack=$(sysctl -n -e net.ipv4.tcp_sack )
 tcp_window_scaling=$(sysctl -n -e net.ipv4.tcp_window_scaling )
 tcp_timestamps=$(sysctl -n -e net.ipv4.tcp_timestamps)
 
-if [ $def_sys_rmem != $def_proc_rmem ]; then echo "rmem_default:  sys($def_sys_rmem) vs proc($def_proc_rmem)"; fi
-if [ $def_sys_wmem != $def_proc_wmem ]; then echo "wmem_default:  sys($def_sys_wmem) vs proc($def_proc_wmem)"; fi
-if [ $max_sys_rmem != $max_proc_rmem ]; then echo "    rmem_max:  sys($max_sys_rmem) vs proc($max_proc_rmem)"; fi
-if [ $max_sys_wmem != $max_proc_wmem ]; then echo "    wmem_max:  sys($max_sys_wmem) vs proc($max_proc_wmem)"; fi
+if [ $def_sys_rmem != $def_proc_rmem ]; then inform "# rmem_default:  sys($def_sys_rmem) vs proc($def_proc_rmem)"; fi
+if [ $def_sys_wmem != $def_proc_wmem ]; then inform "# wmem_default:  sys($def_sys_wmem) vs proc($def_proc_wmem)"; fi
+if [ $max_sys_rmem != $max_proc_rmem ]; then inform "#     rmem_max:  sys($max_sys_rmem) vs proc($max_proc_rmem)"; fi
+if [ $max_sys_wmem != $max_proc_wmem ]; then inform "#     wmem_max:  sys($max_sys_wmem) vs proc($max_proc_wmem)"; fi
 
-# TCP Window Size to test (MSS) -  IPv6 tunnels are 1266?
+inform "# Testing network for 10s to optimze latency numbers"
+HOSTS="bing.com ip4.me google.com"
+for PHOST in ${HOSTS}
+do
+        ping -4 -n -c 1 -w 1 ${PHOST} >/dev/null 2>&1
+        if [ $? -eq 0 ]
+        then
+                break
+        fi
+done
+
+# TCP Window Size to test (MSS) - stay within any gre/ipv6/vpn tunnel size
 WINDOW=1200
 
-PING=$(ping -c 10 -s ${WINDOW} www.google.com | grep ^rtt)
+
+PING=$(ping -4 -n -c 10 -s ${WINDOW} ${PHOST} | grep ^rtt)
 #+ PING='rtt min/avg/max/mdev = 11.001/15.618/20.264/3.189 ms'
 RTT=${PING##*= }
 #+ RTT='11.001/15.618/20.264/3.189 ms'
 DELAY=${RTT%%.*}
 #+ DELAY='11'   -- in milliseconds...
 
-# echo ${DELAY}
+debug "delay to ${PHOST} calculated at ${DELAY}"
 
-## bad assumption of 100mb/s of maximum throughput
-
+# 1000ms  to the second
 MILLISECONDS=1000
 
 WINDOW_BYTES=$(( 2* $BANDWIDTH * $DELAY / $MILLISECONDS / 8 ))  # 2x because end-to-end
 
-if [ $max_sys_rmem -lt ${WINDOW_BYTES} ]; then echo "sysctl -w net.core.rmem_max=${WINDOW_BYTES}"; fi
-if [ $max_sys_wmem -lt ${WINDOW_BYTES} ]; then echo "sysctl -w net.core.wmem_max=${WINDOW_BYTES}"; fi
+if [ $max_sys_rmem -lt ${WINDOW_BYTES} ]; then inform "${SYSCTL}net.core.rmem_max=${WINDOW_BYTES}"; fi
+if [ $max_sys_wmem -lt ${WINDOW_BYTES} ]; then inform "${SYSCTL}net.core.wmem_max=${WINDOW_BYTES}"; fi
 
-if [ $pmtu_disc -ne 0 ]; then echo "sysctl -w net.ipv4.ip_no_pmtu_disc=0"; fi
-if [ $tcp_ecn  -ne 0 ]; then echo "sysctl -w net.ipv4.tcp_ecn=0"; fi
-if [ $tcp_fack  -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_fack=1"; fi
-if [ $tcp_rfc1337  -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_rfc1337=1"; fi
-if [ $tcp_sack  -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_sack=1"; fi
-if [ $tcp_window_scaling  -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_window_scaling=1"; fi
+if [ $pmtu_disc -ne 0 ]; then inform "${SYSCTL}net.ipv4.ip_no_pmtu_disc=0"; fi
+if [ $tcp_ecn  -ne 0 ]; then inform "${SYSCTL}net.ipv4.tcp_ecn=0"; fi
+if [ $tcp_fack  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_fack=1"; fi
+if [ $tcp_rfc1337  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_rfc1337=1"; fi
+if [ $tcp_sack  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_sack=1"; fi
+if [ $tcp_window_scaling  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_window_scaling=1"; fi
 
 
 if [ $DELAY -le 150 ]
 then
-	if [ $tcp_timestamps -ne 1 ]; then echo "sysctl -w net.ipv4.tcp_timestamps=1"; fi
+	# only use TCP timestamps in low-latency situations
+	if [ $tcp_timestamps -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_timestamps=1"; fi
+
+	# BBR(v1) is a good compromise control, though BBR(v2) will be better when available
+        if [ -z "${congestctls##*bbr*}" -a -n "${congestctl##*bbr*}" ]
+        then
+                debug "# Typical delay (>${DELAY}ms) encountered, using bbr congestion control"
+                inform "${SYSCTL}net.ipv4.tcp_congestion_control=bbr"
+        fi
+
 elif [ $DELAY -ge 300 ]
 then
 	if [ -z "${congestctls##*hybla*}" -a -n "${congestctl##*hybla*}" ]
 	then
-		echo "sysctl -w net.ipv4.tcp_congestion_control=hybla"
+		debug "# Excessive delay (>${DELAY}ms) encountered, using hybla (satellite-smart) congestion control"
+		inform "${SYSCTL}net.ipv4.tcp_congestion_control=hybla"
 	fi
-# else
-#       Delay is between 150 and 300... nothing to do for mid-range congestion changes
+else
+#       Delay is between 150 and 300... disable tcp timestamps, but we can still use bbr
+	if [ $tcp_timestamps -ne 0 ]; then inform "${SYSCTL}net.ipv4.tcp_timestamps="; fi
+
+	# try PCC, then fall-back to BBR
+        if [ -z "${congestctls##*pcc*}" -a -n "${congestctl##*pcc*}" ]
+        then
+                debug "# Higher delay (>${DELAY}ms) encountered, using PCC congestion control"
+                inform "${SYSCTL}net.ipv4.tcp_congestion_control=pcc"
+
+        elif [ -z "${congestctls##*bbr*}" -a -n "${congestctl##*bbr*}" ]
+        then
+                debug "# Higher delay (>${DELAY}ms) encountered, using bbr congestion control"
+                inform "${SYSCTL}net.ipv4.tcp_congestion_control=bbr"
+        fi
+
 fi
 
 
@@ -110,7 +193,7 @@ fi
 if [ 0 -eq 1 ]
 then
 
-echo "---- some other values"
+	inform "---- some other values"
 
 # Some sysctl values for squeezing out performance
 cat <<EOF
