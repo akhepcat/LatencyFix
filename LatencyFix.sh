@@ -19,7 +19,7 @@ usage() {
 	printf "\n"
 	printf "examples:\n"
 	printf "     # ${PROG}  10GB\n"
-	printf "     # ${PROG}  100MB\n"
+	printf "     # ${PROG}  100MiB\n"
 	printf "     # ${PROG}  100,000,000\n"
 	printf "     # ${PROG}  1000000\n"
 	printf "\n"
