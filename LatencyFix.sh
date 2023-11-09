@@ -1,4 +1,11 @@
 #!/bin/bash
+# (c) 2015 Leif Sawyer
+# License: GPL 2.0 (see https://github.com/akhepcat/)
+# Permanent home:  https://github.com/akhepcat/LatencyFix/
+# Direct download: https://raw.githubusercontent.com/akhepcat/LatencyFix/master/LatencyFix.sh
+# 
+
+
 PROG="${0##*/}"
 DEBUG=0
 SYSCTL=""
