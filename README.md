@@ -4,6 +4,7 @@ Because satellite services are dumb, and most of the TCP tuning documents are fo
 
 
 * USAGE
+
 	LatencyFix.sh [--help|-h|--debug|-d|-s|--sysctl] {bandwidth}
 
 	 * bandwidth can be specified as bare bits, KiB, KB, MiB, MB, GiB, and GB
