@@ -12,13 +12,13 @@ Because satellite services are dumb, and most of the TCP tuning documents are fo
 	 * -s|--sysctl  output sysctl statements (defaults to bare values for adding to /etc/sysctl.d)
 	
 	examples:
-	     # LatencyFix.sh  10GB
-	     # LatencyFix.sh  100MB
-	     # LatencyFix.sh  100,000,000
-	     # LatencyFix.sh  1000000
+
+	 *     $ sudo LatencyFix.sh  10GB
+	 *     $ sudo LatencyFix.sh  100MiB
+	 *     $ sudo LatencyFix.sh  100,000,000
+	 *     $ sudo LatencyFix.sh  1000000
 	
 	No changes will be made to the system, but suggested commands/values will be printed
 
 	*** not seeing any suggestions?  You may be all tuned, or over-tuned.  Try disabling your existing tuning first!
-
 
