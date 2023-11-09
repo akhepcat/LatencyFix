@@ -7,18 +7,23 @@ Because satellite services are dumb, and most of the TCP tuning documents are fo
 
 	LatencyFix.sh [--help|-h|--debug|-d|-s|--sysctl] {bandwidth}
 
-	 * bandwidth can be specified as bare bits, KiB, KB, MiB, MB, GiB, and GB
-	 * commas are optional and will be stripped out
-	 * -s|--sysctl  output sysctl statements (defaults to bare values for adding to /etc/sysctl.d)
+	* bandwidth can be specified as bare bits, KiB, KB, MiB, MB, GiB, and GB
 	
-	examples:
-
-	 *     $ sudo LatencyFix.sh  10GB
-	 *     $ sudo LatencyFix.sh  100MiB
-	 *     $ sudo LatencyFix.sh  100,000,000
-	 *     $ sudo LatencyFix.sh  1000000
+	* commas are optional and will be stripped out
 	
-	No changes will be made to the system, but suggested commands/values will be printed
+ 	* -s|--sysctl  output sysctl statements (defaults to bare values for adding to /etc/sysctl.d)
+	
+	* No changes will be made to the system, but suggested commands/values will be printed
 
-	*** not seeing any suggestions?  You may be all tuned, or over-tuned.  Try disabling your existing tuning first!
+
+* EXAMPLES
+
+	* $ sudo LatencyFix.sh  10GB
+	* $ sudo LatencyFix.sh  100MiB
+	* $ sudo LatencyFix.sh  100,000,000
+	* $ sudo LatencyFix.sh  1000000
+	
+* TIPS
+
+	* Not seeing any suggestions?  You may be all tuned, or over-tuned.  Try disabling your existing tuning first!
 
