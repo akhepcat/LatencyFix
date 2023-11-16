@@ -95,6 +95,7 @@ inform "# bandwidth set to ${BANDWIDTH} bits per second"
 DEFIF=$(awk 'BEGIN { IGNORECASE=1 } /^[a-z0-9]+[ \t]+00000000/ { print $1 }' /proc/net/route)
 
 # Grab the current information
+def_qdisc=$(sysctl -n -e net.core.default_qdisc)
 congestctls=$(sysctl -n -e net.ipv4.tcp_available_congestion_control)
 congestctl=$(sysctl -n -e net.ipv4.tcp_congestion_control)
 def_sys_rmem=$(sysctl -n -e net.core.rmem_default)
@@ -157,6 +158,13 @@ if [ $tcp_rfc1337  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_rfc1337=1"; fi
 if [ $tcp_sack  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_sack=1"; fi
 if [ $tcp_window_scaling  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_window_scaling=1"; fi
 
+
+aqdiscs=$(ls /lib/modules/`uname -r`/kernel/net/sched/ | grep -iE '_(fq|cake).ko')
+if [ \( -n "${aqdiscs}" -a -z "${aqdiscs##*cake*}" \) -a \( -n "${def_qdisc}" -a -n "${def_qdisc##*cake*}" \) ]
+then
+	# cake is available, not yet enabled, let them eat cake!
+	inform "${SYSCTL}net.core.default_qdisc=cake"
+fi
 
 if [ $DELAY -le 150 ]
 then
