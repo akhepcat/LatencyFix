@@ -3,6 +3,9 @@ Just a dumb script, trying to automate some of the easier portions of TCP tuning
 This should work well for satellite connections, long-haul fiber (> 1000km)
 and even local networks for high-speed (>=10gb) interfaces
 
+This script will enable BBR (Bottleneck Bandwidth & RTT) congestion control,
+as well as the CAKE (Common Applications Kept Enhanced) scheduler (if available)
+
 * USAGE
 
 	LatencyFix.sh [--help|-h|--debug|-d|-s|--sysctl] {bandwidth}
