@@ -26,7 +26,7 @@ as well as the CAKE (Common Applications Kept Enhanced) scheduler (if available)
 	* $ sudo LatencyFix.sh  100,000,000
 	* $ sudo LatencyFix.sh  1000000
 
-	* *** put the auto-generated commands into /etc/sysctl.d
+	*** put the auto-generated commands into /etc/sysctl.d
 
 	* $ sudo LatencyFix.sh  10GB > /etc/sysctl.d/92-latencyfix.conf
 	
