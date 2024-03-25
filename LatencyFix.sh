@@ -32,7 +32,7 @@ usage() {
 debug() {
 	if [ ${DEBUG} -gt 0 ]
 	then
-		printf "${*}\n" 1>&2;
+		printf "#DBG- ${*}\n" 1>&2;
 	fi
 }
 
@@ -143,6 +143,10 @@ DELAY=${RTT%%.*}
 
 debug "delay to ${PHOST} calculated at ${DELAY}"
 
+# -------
+
+debug "lack of output below this line means no changes are recommended at this time"
+
 # 1000ms  to the second
 MILLISECONDS=1000
 
@@ -163,6 +167,7 @@ aqdiscs=$(ls /lib/modules/`uname -r`/kernel/net/sched/ | grep -iE '_(fq|cake).ko
 if [ \( -n "${aqdiscs}" -a -z "${aqdiscs##*cake*}" \) -a \( -n "${def_qdisc}" -a -n "${def_qdisc##*cake*}" \) ]
 then
 	# cake is available, not yet enabled, let them eat cake!
+	debug "# Prefer the cake queueing discipline instead of default fair-queue (fq)"
 	inform "${SYSCTL}net.core.default_qdisc=cake"
 fi
 
@@ -267,4 +272,3 @@ EOF
 fi
 
 fi
-
