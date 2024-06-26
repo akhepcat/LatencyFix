@@ -43,6 +43,19 @@ inform() {
 	printf "${*}\n" 1>&2;
 }
 
+inform_onoff() {
+	local status="disabled"
+	local var=$1
+	shift
+	
+	if [[ ${var:-0} -eq 1 ]]
+	then
+		status=enabled
+	fi
+
+	printf "${*}: ${status}\n" 1>&2;
+}
+
 if [ -z "${1}" ]
 then
 	usage
@@ -116,6 +129,19 @@ if [ ${INFO:-0} -eq 1 -o $def_sys_rmem != $def_proc_rmem ]; then inform "# rmem_
 if [ ${INFO:-0} -eq 1 -o $def_sys_wmem != $def_proc_wmem ]; then inform "# wmem_default:  sys($def_sys_wmem) vs proc($def_proc_wmem)"; fi
 if [ ${INFO:-0} -eq 1 -o $max_sys_rmem != $max_proc_rmem ]; then inform "#     rmem_max:  sys($max_sys_rmem) vs proc($max_proc_rmem)"; fi
 if [ ${INFO:-0} -eq 1 -o $max_sys_wmem != $max_proc_wmem ]; then inform "#     wmem_max:  sys($max_sys_wmem) vs proc($max_proc_wmem)"; fi
+
+if [[ ${INFO:-0} -eq 1 ]]
+then
+	inform "#        qdisc: ${def_qdisc}"
+	inform "# tcp_congestion_control: ${congestctl}"
+	inform_onoff "${pmtu_disc}" "#         pmtu"
+	inform_onoff "${tcp_ecn}" "#      tcp_ecn"
+	inform_onoff "${tcp_fack}" "#     tcp_fack"
+	inform_onoff "${tcp_sack}" "#     tcp_sack"
+	inform_onoff "${tcp_rfc1337}" "#  tcp_rfc1337"
+	inform_onoff "${tcp_window_scaling}" "# tcp_window_scaling"
+	inform_onoff "${tcp_timestamps}"     "# tcp_timestamps"
+fi
 
 inform "# Testing network for 10s to optimze latency numbers"
 
