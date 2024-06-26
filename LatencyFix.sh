@@ -56,19 +56,47 @@ inform_onoff() {
 	printf "${*}: ${status}\n" 1>&2;
 }
 
-if [ -z "${1}" ]
-then
-	usage
-fi
+optspec=":dhis-"
+while getopts "$optspec" optchar; do
+    case "${optchar}" in
+        -)
+            case "${OPTARG}" in
+                debug) DEBUG=1
+                    ;;
+                info) INFO=1
+                    ;;
+                sysctl) SYSCTL="sysctl -w "
+                    ;;
+                help)
+                    usage
+                    exit 1
+                    ;;
+                *)
+                    if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
+                        echo "Unknown option --${OPTARG}" >&2
+                    fi
+                    ;;
+            esac
+            ;;
+        h)  usage
+            exit 1
+            ;;
+        i)  INFO=1
+            ;;
+        d)  DEBUG=1
+            ;;
+        s)  SYSCTL="sysctl -w "
+            ;;
+        *)
+            if [ "$OPTERR" != 1 ] || [ "${optspec:0:1}" = ":" ]; then
+                echo "Non-option argument: '-${OPTARG}'" >&2
+            fi
+            ;;
+    esac
+done
 
-case "${1,,}" in
-	-i|--info) shift; INFO=1 ;;
-	-d|--debug) shift; DEBUG=1 ;;
-	-s|--sysctl) shift; SYSCTL="sysctl -w " ;;
-	-h|--help) usage ; 
-esac
-
-RATE=${1,,}
+RATE="${!OPTIND}"
+RATE=${RATE,,}
 RATE=${RATE//,/}
 
 if [ -z "${RATE%%[0-9]*ki*}" ]
