@@ -8,14 +8,17 @@
 
 PROG="${0##*/}"
 DEBUG=0
+INFO=0
 SYSCTL=""
 
 usage() {
-	printf "${PROG} [--help|-h|--debug|-d|-s|--sysctl] {bandwidth}\n"
+	printf "${PROG} [--help|-h|--debug|-d|--info|-i|--sysctl|-s] {bandwidth}\n"
 	printf "\n"
 	printf " * bandwidth can be specified as bare bits, KiB, KB, MiB, MB, GiB, and GB\n"
 	printf " * commas are optional and will be stripped out\n"
 	printf " * -s|--sysctl  output sysctl statements (defaults to bare values for adding to /etc/sysctl.d)\n"
+	printf " * -i|--info	just print out the current state, don't show proposed changes\n"
+	printf " * -d|--debug	prints extra debugging information during processing\n"
 	printf "\n"
 	printf "examples:\n"
 	printf "     # ${PROG}  10GB\n"
@@ -40,22 +43,17 @@ inform() {
 	printf "${*}\n" 1>&2;
 }
 
-if [ -z "${1}" -o -z "${1%%*h*}" ]
+if [ -z "${1}" ]
 then
 	usage
 fi
 
-if [ -z "${1%%*d*}" ]
-then
-	DEBUG=1
-	shift
-fi
-
-if [ -z "${1%%*s*}" ]
-then
-	SYSCTL="sysctl -w "
-	shift
-fi
+case "${1,,}" in
+	-i|--info) shift; INFO=1 ;;
+	-d|--debug) shift; DEBUG=1 ;;
+	-s|--sysctl) shift; SYSCTL="sysctl -w " ;;
+	-h|--help) usage ; 
+esac
 
 RATE=${1,,}
 RATE=${RATE//,/}
@@ -114,12 +112,14 @@ tcp_sack=$(sysctl -n -e net.ipv4.tcp_sack )
 tcp_window_scaling=$(sysctl -n -e net.ipv4.tcp_window_scaling )
 tcp_timestamps=$(sysctl -n -e net.ipv4.tcp_timestamps)
 
-if [ $def_sys_rmem != $def_proc_rmem ]; then inform "# rmem_default:  sys($def_sys_rmem) vs proc($def_proc_rmem)"; fi
-if [ $def_sys_wmem != $def_proc_wmem ]; then inform "# wmem_default:  sys($def_sys_wmem) vs proc($def_proc_wmem)"; fi
-if [ $max_sys_rmem != $max_proc_rmem ]; then inform "#     rmem_max:  sys($max_sys_rmem) vs proc($max_proc_rmem)"; fi
-if [ $max_sys_wmem != $max_proc_wmem ]; then inform "#     wmem_max:  sys($max_sys_wmem) vs proc($max_proc_wmem)"; fi
+if [ ${INFO:-0} -eq 1 -o $def_sys_rmem != $def_proc_rmem ]; then inform "# rmem_default:  sys($def_sys_rmem) vs proc($def_proc_rmem)"; fi
+if [ ${INFO:-0} -eq 1 -o $def_sys_wmem != $def_proc_wmem ]; then inform "# wmem_default:  sys($def_sys_wmem) vs proc($def_proc_wmem)"; fi
+if [ ${INFO:-0} -eq 1 -o $max_sys_rmem != $max_proc_rmem ]; then inform "#     rmem_max:  sys($max_sys_rmem) vs proc($max_proc_rmem)"; fi
+if [ ${INFO:-0} -eq 1 -o $max_sys_wmem != $max_proc_wmem ]; then inform "#     wmem_max:  sys($max_sys_wmem) vs proc($max_proc_wmem)"; fi
 
 inform "# Testing network for 10s to optimze latency numbers"
+
+# Only one of these needs to work, so we test to see which one does, and then it falls through to the real test
 HOSTS="bing.com ip4.me google.com"
 for PHOST in ${HOSTS}
 do
@@ -141,7 +141,18 @@ RTT=${PING##*= }
 DELAY=${RTT%%.*}
 #+ DELAY='11'   -- in milliseconds...
 
-debug "delay to ${PHOST} calculated at ${DELAY}"
+if [[ ${INFO:-0} -eq 1 ]]
+then
+	# just for the delay output, we'll exit right after
+        DEBUG=1
+fi
+
+debug "delay to ${PHOST} calculated at ${DELAY} ms"
+
+if [[ ${INFO:-0} -eq 1 ]]
+then
+	exit 0
+fi
 
 # -------
 
