@@ -188,8 +188,10 @@ done
 WINDOW=1200
 
 
-PING=$(ping -4 -n -c 10 -s ${WINDOW} ${PHOST} | grep ^rtt)
+PING=$(ping -4 -n -c 10 -s ${WINDOW} ${PHOST} | grep -iE '^(rtt|round-trip)' )
 #+ PING='rtt min/avg/max/mdev = 11.001/15.618/20.264/3.189 ms'
+#       'round-trip min/avg/max/stddev = 43.629/44.876/46.123/1.247 ms'
+
 RTT=${PING##*= }
 #+ RTT='11.001/15.618/20.264/3.189 ms'
 DELAY=${RTT%%.*}
