@@ -129,7 +129,10 @@ then
 fi
 BANDWIDTH=${RATE//[^0-9]/}
 BANDWIDTH=$((BANDWIDTH * $MULTI))
-inform "# bandwidth set to ${BANDWIDTH} bits per second"
+if [ ${BANDWIDTH:-0} -gt 0 ]
+then
+	inform "# bandwidth set to ${BANDWIDTH} bits per second"
+fi
 
 DEFIF=$(awk 'BEGIN { IGNORECASE=1 } /^[a-z0-9]+[ \t]+00000000/ { print $1 }' /proc/net/route)
 
@@ -172,12 +175,21 @@ then
 fi
 
 inform "# Testing network for 10s to optimze latency numbers"
+PING6=$(command -v ping6)
+if [ -n "${PING6}" ]
+then
+	# assume that ping is ipv4 only, because ping6 exists
+	PINGC="ping"
+else
+	# force ping to use ipv4
+	PINGC="ping -4"
+fi
 
 # Only one of these needs to work, so we test to see which one does, and then it falls through to the real test
 HOSTS="bing.com ip4.me google.com"
 for PHOST in ${HOSTS}
 do
-        ping -4 -n -c 1 -w 1 ${PHOST} >/dev/null 2>&1
+        ${PINGC} -n -c 1 -w 1 ${PHOST} >/dev/null 2>&1
         if [ $? -eq 0 ]
         then
                 break
@@ -188,7 +200,7 @@ done
 WINDOW=1200
 
 
-PING=$(ping -4 -n -c 10 -s ${WINDOW} ${PHOST} | grep -iE '^(rtt|round-trip)' )
+PING=$(${PINGC} -n -c 10 -s ${WINDOW} ${PHOST} | grep -iE '^(rtt|round-trip)' )
 #+ PING='rtt min/avg/max/mdev = 11.001/15.618/20.264/3.189 ms'
 #       'round-trip min/avg/max/stddev = 43.629/44.876/46.123/1.247 ms'
 
@@ -230,14 +242,44 @@ if [ $tcp_sack  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_sack=1"; fi
 if [ $tcp_window_scaling  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_window_scaling=1"; fi
 
 
-aqdiscs=$(ls /lib/modules/`uname -r`/kernel/net/sched/ | grep -iE '_(fq|cake).ko')
-if [ \( -n "${aqdiscs}" -a -z "${aqdiscs##*cake*}" \) -a \( -n "${def_qdisc}" -a -n "${def_qdisc##*cake*}" \) ]
+# Queuing disciplines: preferentially [ sch_cake, sch_codel, sch_fq_codel, sch_fq ]
+aqdiscs=$(ls /lib/modules/`uname -r`/kernel/net/sched/ | grep -iE '_(fq|codel|cake).ko')
+if [ -n "${def_qdisc}" -a -n "${def_qdisc##*cake*}" ]
 then
-	# cake is available, not yet enabled, let them eat cake!
-	debug "# Prefer the cake queueing discipline instead of default fair-queue (fq)"
-	inform "${SYSCTL}net.core.default_qdisc=cake"
+	# the qdisc is set, but it's not cake, so make sure we're using the best available
+	if [ -n "${aqdiscs}" ]
+	then
+		# We have some options, let's figure out which one
+		if [ -z "${aqdiscs##*cake*}"  ]
+		then
+			# cake is available, not yet enabled, let them eat cake!
+			debug "# Prefer the cake queueing discipline instead of default fair-queue (fq)"
+			inform "${SYSCTL}net.core.default_qdisc=cake"
+		elif [ -z "${aqdiscs##*fq_codel*}"  ]
+		then
+			# cake not available, but fq_codel is
+			debug "# cake unavailable, using fq_codel"
+			inform "${SYSCTL}net.core.default_qdisc=fq_codel"
+		elif [ -z "${aqdiscs##*codel*}"  ]
+		then
+			# neither cake nor fq_codel are available, but codel is...
+			debug "# cake nor fq_codel unavailable, using limited codel"
+			inform "${SYSCTL}net.core.default_qdisc=codel"
+		else
+			# No real options exist, so it's just kernel default
+			debug "# no advanced queuing available, use this kernel's default"
+		fi
+	else
+		# No real options exist, so it's just kernel default
+		debug "# no advanced queuing available, use this kernel's default"
+	fi
+else
+	# We're already using cake
+	debug "# cake available and enabled, continuing to use it"
 fi
 
+
+# Congestion control
 if [ $DELAY -le 150 ]
 then
 	# only use TCP timestamps in low-latency situations
