@@ -175,10 +175,10 @@ then
 fi
 
 inform "# Testing network for 10s to optimze latency numbers"
-PING6=$(command -v ping6)
-if [ -n "${PING6}" ]
+PING4=$(ping --help 2>&1 | grep -o -- "-4")
+if [ -z "${PING4}" ]
 then
-	# assume that ping is ipv4 only, because ping6 exists
+	# assume that ping is ipv4 only, because there's no -4 flag for it
 	PINGC="ping"
 else
 	# force ping to use ipv4
