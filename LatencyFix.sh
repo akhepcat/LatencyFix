@@ -293,7 +293,6 @@ then
 	if [ -z "${congestctl##*bbr*}" ]
 	then 
 		debug "# Typical delay (>${DELAY}ms) encountered, continuing to use bbr"
-		inform "${SYSCTL}net.ipv4.tcp_congestion_control=bbr"
 	else
 		# Not using BBR currently, so figure out what's available
 	        if [ -z "${congestctls##*bbr*}" ]
