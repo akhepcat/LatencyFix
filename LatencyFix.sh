@@ -242,6 +242,7 @@ if [ $tcp_sack  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_sack=1"; fi
 if [ $tcp_window_scaling  -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_window_scaling=1"; fi
 
 
+debug "# Checking queuing discipline"
 # Queuing disciplines: preferentially [ sch_cake, sch_codel, sch_fq_codel, sch_fq ]
 aqdiscs=$(ls /lib/modules/`uname -r`/kernel/net/sched/ | grep -iE '_(fq|codel|cake).ko')
 if [ -n "${def_qdisc}" -a -n "${def_qdisc##*cake*}" ]
@@ -278,6 +279,7 @@ else
 	debug "# cake available and enabled, continuing to use it"
 fi
 
+debug "# Checking congestion control"
 
 # Congestion control
 if [ $DELAY -le 150 ]
