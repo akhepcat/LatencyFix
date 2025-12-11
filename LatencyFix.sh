@@ -138,7 +138,6 @@ DEFIF=$(awk 'BEGIN { IGNORECASE=1 } /^[a-z0-9]+[ \t]+00000000/ { print $1 }' /pr
 
 # Grab the current information
 def_qdisc=$(sysctl -n -e net.core.default_qdisc)
-congestctls=$(sysctl -n -e net.ipv4.tcp_available_congestion_control)
 congestctl=$(sysctl -n -e net.ipv4.tcp_congestion_control)
 def_sys_rmem=$(sysctl -n -e net.core.rmem_default)
 def_proc_rmem=$(cat /proc/sys/net/core/rmem_default)
@@ -281,6 +280,9 @@ fi
 
 debug "# Checking congestion control"
 
+congestctls=$(ls /lib/modules/`uname -r`/kernel/net/ipv4/ | grep -oiE 'cubic|bbr|illinois')
+congestctls="${congestctls} $(sysctl -n -e net.ipv4.tcp_available_congestion_control)"
+
 # Congestion control
 if [ $DELAY -le 150 ]
 then
@@ -288,10 +290,25 @@ then
 	if [ $tcp_timestamps -ne 1 ]; then inform "${SYSCTL}net.ipv4.tcp_timestamps=1"; fi
 
 	# BBR(v1) is a good compromise control, though BBR(v2) will be better when available
-        if [ -z "${congestctls##*bbr*}" -a -n "${congestctl##*bbr*}" ]
-        then
-                debug "# Typical delay (>${DELAY}ms) encountered, using bbr congestion control"
-                inform "${SYSCTL}net.ipv4.tcp_congestion_control=bbr"
+	if [ -z "${congestctl##*bbr*}" ]
+	then 
+		debug "# Typical delay (>${DELAY}ms) encountered, continuing to use bbr"
+		inform "${SYSCTL}net.ipv4.tcp_congestion_control=bbr"
+	else
+		# Not using BBR currently, so figure out what's available
+	        if [ -z "${congestctls##*bbr*}" ]
+	        then
+			debug "# Typical delay (>${DELAY}ms) encountered, using bbr congestion control"
+			inform "${SYSCTL}net.ipv4.tcp_congestion_control=bbr"
+
+	        elif [ -z "${congestctls##*illinois*}" ]
+	        then
+			debug "# Typical delay (>${DELAY}ms) encountered, bbr not available, using illinois"
+			inform "${SYSCTL}net.ipv4.tcp_congestion_control=illinois"
+		else
+			debug "# Typical delay (>${DELAY}ms) encountered, no other options but CUBIC (default) available"
+			inform "${SYSCTL}net.ipv4.tcp_congestion_control=cubic"
+		fi
         fi
 
 elif [ $DELAY -ge 300 ]
