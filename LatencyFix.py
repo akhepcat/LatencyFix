@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
 import os
 import re
@@ -28,12 +30,14 @@ _IEC_EXPONENTS: dict[str, int] = {
     "pi": 50,
 }
 
-# Matches e.g.:
-#   "10g", "10gb", "10Gbps", "1.25GB/s", "500MiBps", "2500 Mbit", "100MB"
+# Prefix case is flexible (e.g. G, g, Mi, mi), while unit suffix preserves case:
+#   - 'B', 'Bps', 'B/s', 'Byte', 'Bytes' -> bytes (uppercase B)
+#   - 'b', 'bps', 'b/s', 'bit', 'bits'   -> bits (lowercase b)
+#   - omitted unit (e.g. '10g', '10G')     -> defaults to bits
 _RATE_RE = re.compile(
     r"^\s*(?P<num>(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*"
     r"(?P<prefix>(?:[KMGTPEkmgtp]i|[KMGTPEkmgtp]))?"
-    r"(?P<unit>bytes?|byte|bps|b/s|bit|bits|Bps|B/s|b|B)?\s*"
+    r"(?P<unit>(?:Bytes?|Bps|B/s|B|bits?|bps|b/s|b))?\s*"
     r"(?:/s|ps)?\s*$"
 )
 
@@ -41,9 +45,10 @@ _RATE_RE = re.compile(
 def parse_link_speed_bps(raw: str) -> float:
     """
     Parse a link speed string into bits per second (bps).
-    Supports SI (k, M, G, T, P -> 10^n) and IEC (Ki, Mi, Gi, Ti, Pi -> 2^n),
-    bits and bytes, with or without /s or ps suffixes.
-    Bare numbers or prefix-only strings (e.g. '10g', '10gb') default to bits/sec.
+    - Lowercase 'b' (b, bps, b/s, bit, bits) = bits
+    - Uppercase 'B' (B, Bps, B/s, Byte, Bytes) = bytes
+    - Omitted unit (e.g. '10g', '10G', '10Gi') = bits per second
+    Supports SI (k, M, G, T, P -> 10^n) and IEC (Ki, Mi, Gi, Ti, Pi -> 2^n).
     """
     match = _RATE_RE.match(raw)
     if not match:
@@ -56,7 +61,6 @@ def parse_link_speed_bps(raw: str) -> float:
     raw_prefix = match.group("prefix") or ""
     raw_unit = match.group("unit") or ""
 
-    # Determine scale factor from IEC or SI prefix
     if len(raw_prefix) == 2 and raw_prefix[1].lower() == "i":
         iec_key = raw_prefix.lower()
         if iec_key not in _IEC_EXPONENTS:
@@ -68,20 +72,14 @@ def parse_link_speed_bps(raw: str) -> float:
             raise ValueError(f"Unsupported SI prefix {raw_prefix!r} in {raw!r}")
         scale = float(10 ** _SI_EXPONENTS[si_key])
 
-    # Determine whether the unit denotes bytes (multiply by 8 for bits) or bits
-    is_bytes = False
-    if raw_unit in ("B", "Bps", "B/s") or raw_unit.lower().startswith("byte"):
+    if raw_unit.startswith("B"):
         is_bytes = True
-    elif raw_unit == "" and raw_prefix.endswith("B"):
-        # e.g., "10GB" where 'B' was captured in prefix
-        is_bytes = True
-    elif raw_unit in ("", "b", "bps", "b/s") or raw_unit.lower().startswith("bit"):
+    elif raw_unit == "" or raw_unit.startswith("b"):
         is_bytes = False
     else:
         raise ValueError(f"Unrecognized unit {raw_unit!r} in {raw!r}")
 
-    bps = value * scale * (8.0 if is_bytes else 1.0)
-    return bps
+    return value * scale * (8.0 if is_bytes else 1.0)
 
 
 def read_meminfo_bytes(proc_meminfo_path: str = "/proc/meminfo") -> int:
@@ -120,10 +118,8 @@ def build_sysctl_plan(
     ram_bytes = total_ram_bytes if total_ram_bytes is not None else read_meminfo_bytes()
     pg_size = page_size if page_size is not None else get_page_size()
 
-    # Bandwidth-Delay Product in bytes: (bits/sec / 8) * (rtt_ms / 1000)
     bdp_bytes = int((link_speed_bps / 8.0) * (design_rtt_ms / 1000.0))
 
-    # Scale minimum floor gently for sub-1GbE links while keeping >= 4 MiB on >= 1GbE
     min_socket_floor = 4 * 1024 * 1024 if link_speed_bps >= 1e9 else 1 * 1024 * 1024
 
     hard_per_socket_cap = min(
@@ -149,13 +145,11 @@ def build_sysctl_plan(
     core_rmem_default = tcp_rmem_default
     core_wmem_default = tcp_wmem_default
 
-    # tcp_mem is measured in PAGES (not bytes)
     max_tcp_bytes = int(ram_bytes * max_tcp_ram_fraction)
     tcp_mem_high_pages = max(1024, max_tcp_bytes // pg_size)
     tcp_mem_pressure_pages = max(512, int(tcp_mem_high_pages * 0.75))
     tcp_mem_low_pages = max(256, int(tcp_mem_high_pages * 0.50))
 
-    # Scale netdev_max_backlog with both RAM and link speed
     speed_factor = max(1.0, link_speed_bps / 10e9)
     netdev_backlog = clamp(
         int((ram_bytes / (1024**3)) * 16_384 * speed_factor),
@@ -189,7 +183,7 @@ def render_sysctl_conf(plan: SysctlPlan, link_speed_bps: float, rtt_ms: float, r
     return "\n".join(lines) + "\n"
 
 
-def apply_sysctl_conf(conf_text: str, path: str = "/etc/sysctl.d/99-nms-10g-tuning.conf") -> None:
+def apply_sysctl_conf(conf_text: str, path: str = "/etc/sysctl.d/99-network-tuning.conf") -> None:
     tmp_path = f"{path}.tmp.{os.getpid()}"
     with open(tmp_path, "w", encoding="utf-8") as f:
         f.write(conf_text)
@@ -205,11 +199,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--link-speed",
-        default="10Gbps",
+        default="10Gb",
         help=(
             "Target interface speed with optional SI (k, M, G, T, P) or IEC "
-            "(Ki, Mi, Gi, Ti, Pi) prefix and bits/bytes unit (e.g., 10Gbps, 10g, "
-            "1.25GB/s, 950MiBps, 2500Mbps). Default: 10Gbps."
+            "(Ki, Mi, Gi, Ti, Pi) prefix. Lowercase 'b' = bits, uppercase 'B' = bytes "
+            "(e.g., 10Gb, 10Gbps, 1.25GB/s, 900MiB/s, 10G). Default: 10Gb."
         ),
     )
     parser.add_argument(
