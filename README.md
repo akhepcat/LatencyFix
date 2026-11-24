@@ -39,3 +39,8 @@ as well as the CAKE (Common Applications Kept Enhanced) scheduler (if available)
 
 	* Not seeing any suggestions?  You may be all tuned, or over-tuned.  Try disabling your existing tuning first!
 
+
+
+--
+
+New python3 version in progress,  currently only sets sysctl values, does not set any queuing types
