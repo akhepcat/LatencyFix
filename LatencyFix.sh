@@ -142,6 +142,8 @@ max_sys_rmem=$(sysctl -n -e net.core.rmem_max)
 max_proc_rmem=$(cat /proc/sys/net/core/rmem_max)
 max_sys_wmem=$(sysctl -n -e net.core.wmem_max)
 max_proc_wmem=$(cat /proc/sys/net/core/wmem_max)
+sys_tcp_rmem=$(sysctl -n -e net.ipv4.tcp_rmem)
+proc_tcp_rmem=$(cat /proc/sys/net/ipv4/tcp_rmem)
 pmtu_disc=$(sysctl -n -e net.ipv4.ip_no_pmtu_disc)
 tcp_ecn=$(sysctl -n -e net.ipv4.tcp_ecn )
 # This was removed in linux !
@@ -158,7 +160,7 @@ fi
 if [[ ${INFO:-0} -eq 1 ]] || [[ "$def_sys_rmem" != "$def_proc_rmem" ]]; then inform "# rmem_default:  sys($def_sys_rmem) vs proc($def_proc_rmem)"; fi
 if [[ ${INFO:-0} -eq 1 ]] || [[ "$def_sys_wmem" != "$def_proc_wmem" ]]; then inform "# wmem_default:  sys($def_sys_wmem) vs proc($def_proc_wmem)"; fi
 if [[ ${INFO:-0} -eq 1 ]] || [[ "$max_sys_rmem" != "$max_proc_rmem" ]]; then inform "#     rmem_max:  sys($max_sys_rmem) vs proc($max_proc_rmem)"; fi
-if [[ ${INFO:-0} -eq 1 ]] || [[ "$max_sys_wmem" != "$max_proc_wmem" ]]; then inform "#     wmem_max:  sys($max_sys_wmem) vs proc($max_proc_wmem)"; fi
+if [[ ${INFO:-0} -eq 1 ]] || [[ "sys_tcp_rmem" != "$proc_tcp_rmem" ]];  then inform "#     tcp_rmem:  sys($sys_tcp_rmem) vs proc($proc_tcp_rmem)"; fi
 
 if [[ ${INFO:-0} -eq 1 ]]
 then
