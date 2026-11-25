@@ -1,22 +1,46 @@
-Just a dumb script, trying to automate some of the easier portions of TCP tuning for long-haul high-latency networks.
+Just a dumb python script, trying to automate some of the easier portions of TCP tuning for long-haul high-latency networks.
 
 This should work well for satellite connections, long-haul fiber (> 1000km)
 and even local networks for high-speed (>=10gb) interfaces
 
 This script will enable BBR (Bottleneck Bandwidth & RTT) congestion control,
-as well as the CAKE (Common Applications Kept Enhanced) scheduler (if available)
+as well as the fq scheduler, which for most server applications is better.
+
+For endpoints behind DOCSIS or DSL modems, you can manually change to the
+CAKE (Common Applications Kept Enhanced) scheduler if available on your
+system.
+
+Recently migrated from bash to python and modernized away from pre-2015
+defaults.
+
 
 * USAGE
 
-	LatencyFix.sh [--help|-h|--debug|-d|--info|-i|--sysctl|-s] {bandwidth}
+    $  LatencyFix.py [-h] [--link-speed LINK_SPEED] [--rtt-ms RTT_MS]
+                     [--meminfo-path MEMINFO_PATH] [--out-file OUT_FILE]
+                     [--no-modprobe-check] [--apply]
 
-	 * bandwidth can be specified as bare bits, KiB, KB, MiB, MB, GiB, and GB
-	 * commas are optional and will be stripped out
+Deterministically generate (and optionally apply) sysctl network tuning for
+NMS nodes.
 
-	 * -s|--sysctl  output sysctl statements (defaults to bare values for adding to /etc/sysctl.d)
-	 * -i|--info    just print out the current state, don't show proposed changes
-	 * -d|--debug   prints extra debugging information during processing
-
+options:
+  -h, --help            show this help message and exit
+  --link-speed LINK_SPEED
+                        Target interface speed with optional SI (k, M, G, T,
+                        P) or IEC (Ki, Mi, Gi, Ti, Pi) prefix. Lowercase 'b' =
+                        bits, uppercase 'B' = bytes (e.g., 10Gb, 10Gbps,
+                        1.25GB/s, 900MiB/s, 10G). Default: 10Gb.
+  --rtt-ms RTT_MS       Design round-trip time in milliseconds for BDP
+                        calculation. Default: 50.0.
+  --meminfo-path MEMINFO_PATH
+                        Path to meminfo file (useful for unit tests). Default:
+                        /proc/meminfo.
+  --out-file OUT_FILE   Destination sysctl drop-in path when --apply is used.
+                        Default: /etc/sysctl.d/99-network-tuning.conf
+  --no-modprobe-check   Skip read-only `modprobe --dry-run` availability
+                        checks.
+  --apply               Write the sysctl file (does not apply changes to the
+                        running kernel)
 
 
 * EXAMPLES
@@ -24,14 +48,11 @@ as well as the CAKE (Common Applications Kept Enhanced) scheduler (if available)
 	*** this script does not have to be run as root, typically, except on very locked-down systems.
 
 
-	* $ LatencyFix.sh  10GB
-	* $ LatencyFix.sh  100MiB
-	* $ LatencyFix.sh  100,000,000
-	* $ LatencyFix.sh  1000000
+	* $ LatencyFix.sh  --link-speed 10GB
+	* $ LatencyFix.sh  --link-speed 100MiB
+	* $ LatencyFix.sh  --link-speed 1000000 --apply
 
-	*** put the auto-generated commands into /etc/sysctl.d *** be sure to review afterward!  
-
-	* $ LatencyFix.sh 10GB | sudo tee -a /etc/sysctl.d/92-latencyfix.conf
+	*** '--apply' will put the auto-generated commands into /etc/sysctl.d *** be sure to review afterward!
 	
 * TIPS
 
@@ -40,7 +61,5 @@ as well as the CAKE (Common Applications Kept Enhanced) scheduler (if available)
 	* Not seeing any suggestions?  You may be all tuned, or over-tuned.  Try disabling your existing tuning first!
 
 
-
---
-
-New python3 version in progress,  currently only sets sysctl values, does not set any queuing types
+* LEGACY
+  The legacy bash script is still available, and it's README is [[Legacy.md]]
