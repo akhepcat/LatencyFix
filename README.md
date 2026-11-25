@@ -15,38 +15,46 @@ defaults.
 
 
 * USAGE
-
-    $  LatencyFix.py [-h] [--link-speed LINK_SPEED] [--rtt-ms RTT_MS]
+```
+$  LatencyFix.py [-h] [--link-speed LINK_SPEED] [--rtt-ms RTT_MS]
                      [--meminfo-path MEMINFO_PATH] [--out-file OUT_FILE]
                      [--no-modprobe-check] [--apply]
 
-Deterministically generate (and optionally apply) sysctl network tuning for
-NMS nodes.
+Deterministically generate (and optionally apply) sysctl network tuning for NMS nodes.
 
-options:
-  -h, --help            show this help message and exit
-  --link-speed LINK_SPEED
+options:    
+	-h, --help            show this help message and exit
+
+	--link-speed LINK_SPEED
                         Target interface speed with optional SI (k, M, G, T,
                         P) or IEC (Ki, Mi, Gi, Ti, Pi) prefix. Lowercase 'b' =
                         bits, uppercase 'B' = bytes (e.g., 10Gb, 10Gbps,
                         1.25GB/s, 900MiB/s, 10G). Default: 10Gb.
-  --rtt-ms RTT_MS       Design round-trip time in milliseconds for BDP
+
+	--rtt-ms RTT_MS
+	                    Design round-trip time in milliseconds for BDP
                         calculation. Default: 50.0.
-  --meminfo-path MEMINFO_PATH
+    
+	--meminfo-path MEMINFO_PATH
                         Path to meminfo file (useful for unit tests). Default:
                         /proc/meminfo.
-  --out-file OUT_FILE   Destination sysctl drop-in path when --apply is used.
+    
+	--out-file OUT_FILE
+	                    Destination sysctl drop-in path when --apply is used.
                         Default: /etc/sysctl.d/99-network-tuning.conf
-  --no-modprobe-check   Skip read-only `modprobe --dry-run` availability
+    
+	--no-modprobe-check
+	                    Skip read-only `modprobe --dry-run` availability
                         checks.
-  --apply               Write the sysctl file (does not apply changes to the
+    
+	--apply
+	                    Write the sysctl file (does not apply changes to the
                         running kernel)
-
+```
 
 * EXAMPLES
 
 	*** this script does not have to be run as root, typically, except on very locked-down systems.
-
 
 	* $ LatencyFix.sh  --link-speed 10GB
 	* $ LatencyFix.sh  --link-speed 100MiB
@@ -62,4 +70,6 @@ options:
 
 
 * LEGACY
-  The legacy bash script is still available, and it's README is [[Legacy.md]]
+  
+  The legacy bash script is still available, along with its [README](Legacy.md)
+  
